@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Jonalandia</title>
+<meta property="og:title" content="Jonalandia">
+<meta property="og:description" content="El juego de parkour de Jona">
+<style>
+:root{--bg:#f3f1ea;--fg:#1d1d1f;--btn:#fff;--bd:#bbb;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17181c;--fg:#f2f2f2;--btn:#2a2c33;--bd:#555}}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,sans-serif;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+#w{max-width:820px;margin:0 auto;padding:8px}
+#st{position:relative}
+canvas{width:100%;display:block;border-radius:10px;background:#9bd3f0}
+#hud{position:absolute;left:10px;top:8px;color:#111;font-weight:700;font-size:15px;text-shadow:0 0 4px #fff}
+#bw{width:150px;height:10px;background:rgba(0,0,0,.3);border-radius:5px;margin-top:4px;overflow:hidden}
+#bf{height:100%;width:100%;background:#3c3}
+#bt{font-size:12px;font-weight:600}
+#msg{position:absolute;left:0;right:0;top:20%;text-align:center;font-size:22px;font-weight:800;color:#111;text-shadow:0 0 6px #fff}
+#ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.55);color:#fff;border-radius:10px;text-align:center;padding:10px;gap:8px}
+#ov b{font-size:30px}#ov button{padding:10px 18px}
+#menu{text-align:center;padding:10px 0}h1{margin:6px;font-size:30px}h2{font-size:17px;margin:14px 0 4px}
+#pl{background:#3c3;color:#fff;border-color:#2a2;font-size:20px;padding:14px 40px;margin:10px}
+#grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.card{display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 6px}
+.card.on{border-color:#3c3;box-shadow:0 0 0 2px #3c3}.card:disabled{opacity:.55}
+.sw i{display:inline-block;width:26px;height:26px;border-radius:50%;border:1px solid #888;margin:0 2px}
+#b{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+button{font-size:15px;padding:16px 4px;border-radius:12px;border:2px solid var(--bd);background:var(--btn);color:var(--fg);font-weight:600}
+button:active{transform:scale(.95)}
+#s{background:#f5b800;color:#222;border-color:#c48f00}
+p{font-size:13px;opacity:.8;margin:8px 2px}
+</style></head><body><div id="w">
+<div id="menu"><h1>🏃 JONALANDIA</h1><div>Récord: <b id="best">0</b> pts</div><button id="pl">▶ Jugar</button><h2>🎁 Recompensas: atuendos</h2><div id="nx"></div><div id="grid"></div></div>
+<div id="game" style="display:none">
+<div id="st"><canvas id="c"></canvas>
+<div id="hud"><div id="sc"></div><div id="bw"><div id="bf"></div></div><div id="bt"></div></div>
+<div id="msg"></div>
+<div id="ov" style="display:none"><b id="ot"></b><div id="os"></div><div><button id="rt">Reintentar</button> <button id="mb">Menú</button></div></div></div>
+<div id="b"><button id="j">⬆ Saltar</button><button id="d">⬇ Agacharse</button><button id="m">✋ Manotazo</button><button id="s">⚡ Superjona</button></div>
+<p>Teclado: Espacio/↑ saltar · ↓ agacharse · X manotazo · S Superjona. Esquiva autos y vigas bajas (agáchate), manotea las solicitudes de trabajo. Superjona rompe todo, ¡pero un muro la cancela!</p></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const G=330,PX=100,$=id=>document.getElementById(id);
+if(typeof THREE==='undefined'){$('ot').textContent='No se pudo cargar el motor 3D'}
+const R=new THREE.WebGLRenderer({canvas:$('c'),antialias:true});R.setPixelRatio(Math.min(devicePixelRatio||1,2));R.setSize(800,400,false);
+const S=new THREE.Scene(),cam=new THREE.PerspectiveCamera(45,2,1,3000);
+cam.position.set(330,235,540);cam.lookAt(400,150,0);
+S.add(new THREE.AmbientLight(0xffffff,.7));const dl=new THREE.DirectionalLight(0xffffff,.8);dl.position.set(200,500,400);S.add(dl);
+const M=(c,e)=>new THREE.MeshLambertMaterial({color:c,emissive:e||0}),BG=new THREE.BoxGeometry(1,1,1);
+const U=(m,w,h,d,x,y,z)=>{const q=new THREE.Mesh(BG,m);q.scale.set(w,h,d);q.position.set(x||0,y||0,z||0);return q};
+const skin=M(0x4a2c17),shirt=M(0x1e5bd8),pants=M(0x111111),cape=M(0xdd2222);
+// suelo
+S.add(U(M(0x6b6f75),3000,40,320,400,-20,0));
+const stripes=[];for(let i=0;i<10;i++){const q=U(M(0xffffff),50,1,6,0,.5,70);S.add(q);stripes.push(q)}
+// Jona 3D redondeado
+const SG=new THREE.SphereGeometry(.5,16,12),E=(m,w,h,d,x,y,z)=>{const q=new THREE.Mesh(SG,m);q.scale.set(w,h,d);q.position.set(x||0,y||0,z||0);return q};
+const eyeM=M(0x000000),J=new THREE.Group(),bandM=M(0xdd1111),capM=M(0xdd2222),crownM=M(0xffcc00,0x332200);
+const legL=E(pants,13,1,13),legR=E(pants,13,1,13),torso=E(shirt,28,1,22),belly=E(shirt,26,1,26),
+head=new THREE.Mesh(new THREE.SphereGeometry(11,18,14),skin),eA=E(eyeM,4,5,4),eB=E(eyeM,4,5,4),
+slL=E(shirt,10,1,10),slR=E(shirt,10,1,10),skL=E(skin,8,1,8),skR=E(skin,8,1,8),hL=E(skin,9,9,9),hR=E(skin,9,9,9),cp=U(cape,4,1,22);
+const hand=new THREE.Group();hand.add(E(skin,15,17,8));
+[[-6.5,11],[-2.2,14],[2.2,13],[6.5,10]].forEach(a=>hand.add(E(skin,a[1],4.6,4.6,6+a[1]/2,a[0],0)));
+hand.add(E(skin,10,5,5,4,-11,0));hand.scale.setScalar(1.25);
+const acc=new THREE.Group(),band=new THREE.Mesh(new THREE.TorusGeometry(11.4,1.9,8,24),bandM),cap=new THREE.Group(),
+crown=new THREE.Mesh(new THREE.CylinderGeometry(8,6.5,9,8),crownM);
+band.rotation.x=Math.PI/2;band.position.y=3;crown.position.y=11;
+cap.add(new THREE.Mesh(new THREE.SphereGeometry(11.8,16,8,0,Math.PI*2,0,Math.PI/2),capM),U(capM,12,1.6,18,11,0,0));cap.position.y=3.5;
+acc.add(band,cap,crown);
+J.add(legL,legR,torso,belly,head,eA,eB,slL,slR,skL,skR,hL,hR,cp,hand,acc);S.add(J);
+const OUT=[{n:'Clásico',need:0,shirt:0x1e5bd8,pants:0x111111,acc:''},{n:'Deportivo',need:300,shirt:0xdd2222,pants:0xeeeeee,acc:'cap'},
+{n:'Ninja',need:800,shirt:0x1a1a1a,pants:0x2b2b2b,acc:'band'},{n:'Playero',need:1500,shirt:0xff8c1a,pants:0x16b5b5,acc:''},{n:'Rey Dorado',need:3000,shirt:0xf5b800,pants:0x7a1fa2,acc:'crown'}];
+function applyOut(){const o=OUT[eq];shirt.color.setHex(o.shirt);pants.color.setHex(o.pants);band.visible=o.acc==='band';cap.visible=o.acc==='cap';crown.visible=o.acc==='crown'}
+function poseJ(h,run,sw,sp,t){
+ const lh=(h-22)*.53,th=(h-22)*.47,a=Math.sin(t*14)*run*9,top=lh+th;
+ legL.scale.y=legR.scale.y=lh+6;legL.position.set(a,lh/2,-6);legR.position.set(-a,lh/2,6);
+ torso.scale.y=th+10;torso.position.set(0,lh+th/2,0);
+ belly.scale.y=th*.85;belly.position.set(8,lh+th*.38,0);
+ head.position.set(2,top+10,0);acc.position.copy(head.position);
+ eA.position.set(12,top+12,4.5);eB.position.set(12,top+12,-4.5);
+ const sy=top-th*.2;
+ slL.scale.y=slR.scale.y=th*.5+5;slL.position.set(-a*.6,sy,-15);slR.position.set(a*.6,sy,15);
+ const al=th*.6+6,ay=sy-th*.25-al/2;
+ skL.scale.y=al;skL.position.set(-a*.6,ay,-15);hL.position.set(-a*.6,ay-al/2-2,-15);
+ hand.visible=sw>0;hR.visible=!(sw>0);
+ if(sw>0){skR.scale.set(50,9,9);skR.position.set(30,sy,15);hand.position.set(60,sy,15)}
+ else{skR.scale.set(8,al,8);skR.position.set(a*.6,ay,15);hR.position.set(a*.6,ay-al/2-2,15)}
+ cp.visible=sp>0;cp.scale.y=th+12;cp.position.set(-16,lh+th/2,0);
+ const e=sp>0?0x664400:0;shirt.emissive.setHex(e);skin.emissive.setHex(e?0x331a00:0)}
+function menu(){$('best').textContent=best;const n=OUT.find(o=>best<o.need);
+ $('nx').textContent=n?'Próximo: '+n.n+' a los '+n.need+' pts (te faltan '+(n.need-best)+')':'¡Desbloqueaste todos los atuendos!';
+ const hx=c=>'#'+c.toString(16).padStart(6,'0');
+ $('grid').innerHTML=OUT.map((o,i)=>{const u=best>=o.need;return '<button class="card'+(i===eq?' on':'')+'" data-i="'+i+'"'+(u?'':' disabled')+'><span class="sw"><i style="background:'+hx(o.shirt)+'"></i><i style="background:'+hx(o.pants)+'"></i></span><b>'+o.n+'</b><small>'+(i===eq?'Equipado':u?'Toca para usar':'🔒 '+o.need+' pts')+'</small></button>'}).join('')}
+$('grid').addEventListener('click',e=>{const b=e.target.closest('.card');if(!b||b.disabled)return;eq=+b.dataset.i;try{localStorage.setItem('je',eq)}catch(x){}applyOut();menu()});
+function startGame(){$('menu').style.display='none';$('game').style.display='block';reset()}
+function goMenu(){st='menu';crouchHold=false;$('ov').style.display='none';$('game').style.display='none';$('menu').style.display='block';menu()}
+$('pl').onclick=startGame;$('rt').onclick=()=>reset();$('mb').onclick=goMenu;
+// juego
+let st='menu',p,obs=[],parts=[],dist,best=0,eq=0,speed,nxt,sup,supCD,swat,crouchHold=false,keys={},flash=0,msgT=0,t0=0,clock=0;
+function reset(){obs.forEach(o=>S.remove(o.m));parts.forEach(q=>S.remove(q.m));obs=[];parts=[];p={y:G,vy:0};dist=0;speed=300;nxt=500;sup=0;supCD=0;swat=0;flash=0;st='play';$('ov').style.display='none'}
+reset();st='menu';try{best=+localStorage.getItem('jb')||0;eq=+localStorage.getItem('je')||0}catch(e){}if(!OUT[eq]||best<OUT[eq].need)eq=0;applyOut();menu();
+function say(m){$('msg').textContent=m;msgT=1.5}
+function jump(){if(st==='menu'){startGame();return}if(st==='over'){reset();return}if(p.y>=G)p.vy=-740}
+function doSwat(){if(st==='play'&&swat<=0)swat=.3}
+function doSuper(){if(st!=='play')return;if(sup>0||supCD>0){say(sup>0?'¡Ya estás en Superjona!':'Superjona en enfriamiento');return}sup=20;say('¡SUPERJONA!')}
+function bind(id,dn,up){const e=$(id);e.addEventListener('pointerdown',ev=>{ev.preventDefault();dn()});if(up)['pointerup','pointerleave','pointercancel'].forEach(n=>e.addEventListener(n,up))}
+bind('j',jump);bind('m',doSwat);bind('s',doSuper);bind('d',()=>crouchHold=true,()=>crouchHold=false);
+$('c').addEventListener('pointerdown',()=>{if(st!=='play')jump()});
+addEventListener('keydown',e=>{if(e.repeat)return;const k=e.key.toLowerCase();if(k===' '||k==='arrowup'||k==='w'){jump();e.preventDefault()}if(k==='arrowdown')keys.d=1;if(k==='x')doSwat();if(k==='s')doSuper()});
+addEventListener('keyup',e=>{if(e.key==='ArrowDown')keys.d=0});
+function mk(o){const g=new THREE.Group();
+ if(o.t==='car'){g.add(U(M(0xdd3333),80,24,56,0,21,0),U(M(0xee6666),44,7,48,2,36.5,0),U(M(0xffee88),3,6,40,-40,22,0));
+  const wg=new THREE.CylinderGeometry(9,9,6,12);wg.rotateX(Math.PI/2);const wm=M(0x222222);
+  [[-24,-28],[24,-28],[-24,28],[24,28]].forEach(a=>{const w=new THREE.Mesh(wg,wm);w.position.set(a[0],9,a[1]);g.add(w)})}
+ else if(o.t==='wall')g.add(U(M(0x8a5a44),24,110,80,0,55,0),U(M(0x6d4533),25,4,81,0,30,0),U(M(0x6d4533),25,4,81,0,70,0));
+ else if(o.t==='beam')g.add(U(M(0x4a3a2a),130,470,120,0,235,0),U(M(0xffdd00),132,8,122,0,4,0));
+ else{g.add(U(M(0xffffff),30,34,3,0,17,0));[8,15,22].forEach(y=>g.add(U(M(0xcc3333),22,2,1,0,y+4,2)));g.add(U(M(0x333333),12,3,1,-6,30,2))}
+ g.position.y=G-(o.y+o.h);o.m=g;S.add(g)}
+function spawn(){const r=Math.random(),X=860;let o;
+ if(r<.38)o={t:'car',x:X,y:G-40,w:80,h:40};
+ else if(r<.58)o={t:'wall',x:X,y:G-110,w:24,h:110};
+ else if(r<.8)o={t:'beam',x:X,y:0,w:130,h:270};
+ else o={t:'paper',x:X,y:248,w:30,h:34};
+ mk(o);obs.push(o);nxt=380+Math.random()*320+speed*.35}
+function boom(o,col){for(let i=0;i<10;i++){const m=U(M(col),6,6,6);m.position.set(o.x+o.w/2,G-(o.y+o.h/2),0);S.add(m);parts.push({m,vx:(Math.random()-.3)*400,vy:(Math.random()-.2)*500,vz:(Math.random()-.5)*300,l:.6})}}
+function kill(o){o.dead=1;S.remove(o.m)}
+function update(dt){
+ speed=Math.min(300+dist/35,620);dist+=speed*dt;
+ const crouch=(crouchHold||keys.d)&&p.y>=G;
+ p.vy+=1900*dt;p.y=Math.min(G,p.y+p.vy*dt);if(p.y>=G)p.vy=0;
+ if(swat>0)swat-=dt;
+ if(sup>0){sup-=dt;if(sup<=0){sup=0;supCD=60;say('Superjona terminó')}}else if(supCD>0)supCD=Math.max(0,supCD-dt);
+ nxt-=speed*dt;if(nxt<=0)spawn();
+ const h=crouch?45:90,top=p.y-h,L=PX+4,Rr=PX+28;
+ for(const o of obs){o.x-=speed*dt;if(o.dead)continue;
+  const hit=Rr>o.x&&L<o.x+o.w&&p.y-2>o.y&&top+2<o.y+o.h;
+  const sw=swat>0&&o.t==='paper'&&o.x<PX+95&&o.x+o.w>PX+30&&o.y<p.y&&o.y+o.h>top-10;
+  if(sw){boom(o,'#ffffff');kill(o);dist+=80;continue}
+  if(!hit)continue;
+  if(sup>0){boom(o,o.t==='wall'?'#888888':'#f5b800');kill(o);dist+=60;
+   if(o.t==='wall'){sup=0;supCD=60;flash=.4;say('¡Chocaste con un muro! Superjona perdida')}}
+  else{st='over';const old=best;best=Math.max(best,Math.floor(dist/10));try{localStorage.setItem('jb',best)}catch(x){}const nw=OUT.filter(o=>o.need>old&&o.need<=best);$('ot').textContent='¡Game over!';$('os').textContent='Puntos: '+Math.floor(dist/10)+(nw.length?' · 🎁 Nuevo atuendo: '+nw.map(o=>o.n).join(', '):'');$('ov').style.display='flex';return}}
+ obs=obs.filter(o=>{if(o.x<-200&&!o.dead)S.remove(o.m);return o.x>-200&&!o.dead});
+ parts.forEach(q=>{q.m.position.x+=q.vx*dt;q.m.position.y+=q.vy*dt;q.m.position.z+=q.vz*dt;q.vy-=900*dt;q.l-=dt;if(q.l<=0)S.remove(q.m)});parts=parts.filter(q=>q.l>0);
+ if(flash>0)flash-=dt;if(msgT>0){msgT-=dt;if(msgT<=0)$('msg').textContent=''}}
+function render(){
+ const cr=(crouchHold||keys.d)&&p.y>=G;
+ J.position.set(PX+16,G-p.y,0);
+ poseJ(cr?45:90,st==='play'&&p.y>=G&&!cr?1:0,swat,sup,clock);
+ obs.forEach(o=>{if(!o.dead)o.m.position.x=o.x+o.w/2});
+ stripes.forEach((q,i)=>q.position.x=((i*100-dist)%1000+1000)%1000-100);
+ S.background=new THREE.Color(flash>0?0xffffff:sup>0?0xffd96b:0x9bd3f0);
+ $('sc').textContent='Puntos: '+Math.floor(dist/10)+'   Récord: '+best;
+ const f=sup>0?sup/20:supCD>0?1-supCD/60:1;$('bf').style.width=(f*100)+'%';$('bf').style.background=sup>0?'#f5b800':supCD>0?'#999':'#3c3';
+ $('bt').textContent=sup>0?'Superjona '+Math.ceil(sup)+'s':supCD>0?'Enfriamiento '+Math.ceil(supCD)+'s':'Superjona lista';
+ R.render(S,cam)}
+function loop(t){const dt=Math.min(.033,(t-t0)/1000||0);t0=t;clock+=dt;if(st==='play')update(dt);render();requestAnimationFrame(loop)}
+requestAnimationFrame(t=>{t0=t;loop(t)});
+</script></body></html>
